@@ -210,6 +210,43 @@ TheNexus dashboard reads from `~/dev/projects/projects.json` to display:
 - ✅ Project isolation (no cross-contamination)
 - ✅ All agents share same data source
 
+## Spawning Subagents for Tasks
+
+When spawning a subagent to work on a project task, **always include**:
+
+1. **Full task description** (not just title)
+2. **Project context** (which project, task ID, location)
+3. **pm CLI instructions** (how to complete the task)
+4. **Explicit completion reminder** (run `pm task complete` when done)
+
+**Template:** See `SUBAGENT_TEMPLATE.md` for the full spawn template.
+
+**Example:**
+```bash
+# Spawn subagent for task-004
+sessions_spawn --task "
+**Task-004:** \"Add the ability in the UI to start a task\"
+
+**Full Description:**
+\"The card should allow to start a task in todo. We need to be able to choose the agent that should run the task, and then the agent should wake up and do the task\"
+
+## Project Context
+**Project:** thenexus
+**Task ID:** task-004
+
+## Available Commands
+pm task info task-004
+pm task complete task-004 --message \"summary\"
+
+## What to Do When Finished
+1. Test your work
+2. Run: pm task complete task-004 --message \"summary\"
+3. End your session
+"
+```
+
+**Why this matters:** Subagents don't automatically know about the project-manager skill. They need explicit instructions on how to complete tasks and mark them done.
+
 ## Future Enhancements
 
 - [ ] Drag-and-drop kanban in TheNexus UI
