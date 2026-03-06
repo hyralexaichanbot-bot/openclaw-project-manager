@@ -10,7 +10,7 @@ Manage multiple projects simultaneously with isolated context, tasks, and memori
 
 This skill lives at: `~/.openclaw/skills/project-manager/`
 
-Available to all agents (coder, main, tasker) automatically.
+Available to all agents automatically.
 
 ## CLI Commands
 
@@ -89,7 +89,7 @@ session list [--project <name>]
 
 ```bash
 # 1. Switch to the project
-project switch thenexus
+project switch my-project
 
 # 2. Review context and memories
 memory context
@@ -106,10 +106,10 @@ task move task-001 in-progress
 
 ```bash
 # Save important discoveries
-memory save "TheNexus uses Hono + HTMX, no build step needed"
+memory save "Learned that approach X works better than Y"
 
 # Attach session for tracking
-session attach agent:coder:discord:...
+session attach <session-key>
 ```
 
 ### Completing Work
@@ -145,12 +145,10 @@ All project data stored in: `~/dev/projects/`
 ```
 ~/dev/projects/
 ├── projects.json           # Master database (tasks, active project)
-├── thenexus/
+├── <project-name>/
 │   ├── context.md          # Project goals, stack, decisions
 │   ├── memory.md           # Project-specific learnings (append-only)
 │   └── sessions.json       # Attached session history
-├── python-anthemav/
-│   └── ...
 └── ...
 ```
 
@@ -159,16 +157,16 @@ All project data stored in: `~/dev/projects/`
 ```json
 {
   "projects": {
-    "thenexus": {
-      "name": "thenexus",
-      "path": "/home/azureuser/dev/projects/thenexus",
+    "my-project": {
+      "name": "my-project",
+      "path": "~/dev/projects/my-project",
       "active": true,
       "createdAt": "2026-03-06T08:00:00Z",
       "tasks": [
         {
           "id": "task-001",
-          "title": "Build session detail view",
-          "description": "Allow clicking sessions to see transcript",
+          "title": "Build feature",
+          "description": "Description here",
           "status": "done",
           "createdAt": "2026-03-06T08:00:00Z",
           "updatedAt": "2026-03-06T20:00:00Z",
@@ -177,7 +175,7 @@ All project data stored in: `~/dev/projects/`
       ]
     }
   },
-  "activeProject": "thenexus"
+  "activeProject": "my-project"
 }
 ```
 
@@ -249,19 +247,19 @@ task move task-004 in-progress
 ### Example 3: Context Switch
 
 ```bash
-# Finishing TheNexus work
+# Finishing work on a project
 task move task-010 in-progress
-session attach agent:coder:discord:...
+session attach <session-key>
 
 # Switch to Home Assistant
-project switch homeassistant-core
+project switch another-project
 memory context
 task kanban
 
-# Work on HA task
-task move ha-task-005 in-progress
+# Work on a task
+task move task-005 in-progress
 
 # Later: switch back
-project switch thenexus
+project switch my-project
 task info task-010  # See where you left off
 ```
