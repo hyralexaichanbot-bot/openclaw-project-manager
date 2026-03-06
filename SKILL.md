@@ -113,12 +113,15 @@ session attach <session-key>
 ### Completing Work
 
 ```bash
-# Mark task done
-task complete task-001
+# Mark task done (with optional summary)
+task complete task-001 --message "Added UI form for task creation"
 
-# Save final learnings
+# Or separately
+task complete task-001
 memory save "Completed session detail view with transcript and kill button"
 ```
+
+**Best Practice:** Always complete your task before ending a session! If you spawned for a specific task, run `task complete <id>` as your last action.
 
 ### Switching Projects
 

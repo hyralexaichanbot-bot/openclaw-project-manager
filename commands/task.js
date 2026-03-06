@@ -178,21 +178,25 @@ switch (command) {
   }
   
   case 'complete':
-  case 'done': {
-    // task complete <id> [--project <name>]
+  case 'done':
+  case 'finish': {
+    // task complete <id> [--project <name>] [--message "summary"]
     let projectName = null;
     let taskId = null;
+    let message = null;
     
     for (let i = 0; i < args.length; i++) {
       if (args[i] === '--project' && args[i + 1]) {
         projectName = args[++i];
-      } else if (!taskId) {
+      } else if (args[i] === '--message' && args[i + 1]) {
+        message = args[++i];
+      } else if (!taskId && !args[i].startsWith('--')) {
         taskId = args[i];
       }
     }
     
     if (!taskId) {
-      console.error('Usage: task complete <id> [--project <name>]');
+      console.error('Usage: task complete <id> [--project <name>] [--message "summary"]');
       process.exit(1);
     }
     
@@ -200,6 +204,20 @@ switch (command) {
     try {
       const task = pm.moveTask(projectName, taskId, 'done');
       console.log(`✓ Task ${task.id} completed!`);
+      
+      // If message provided, save to project memory
+      if (message) {
+        pm.addMemory(projectName, `Completed ${taskId}: ${message}`);
+        console.log(`✓ Memory saved: ${message}`);
+      }
+      
+      // Show completion summary
+      const duration = new Date(task.completedAt) - new Date(task.createdAt);
+      const hours = Math.floor(duration / 3600000);
+      const mins = Math.floor((duration % 3600000) / 60000);
+      console.log(`\n📊 Task Summary:`);
+      console.log(`   Duration: ${hours > 0 ? hours + 'h ' : ''}${mins}m`);
+      console.log(`   Status: ${task.status}`);
     } catch (e) {
       console.error(e.message);
       process.exit(1);
@@ -309,13 +327,17 @@ switch (command) {
 Project Manager - Task Commands
 
 Usage:
-  task add "title" [--project <name>]     Add a new task
-  task list [--project <name>]            List all tasks
-  task move <id> <status>                 Move task (todo/in-progress/done)
-  task complete <id>                      Mark task as done
-  task delete <id>                        Delete a task
-  task info <id>                          Show task details
-  task kanban                             Show kanban view
+  task add "title" [--project <name>]           Add a new task
+  task list [--project <name>]                  List all tasks
+  task move <id> <status>                       Move task (todo/in-progress/done)
+  task complete <id> [--message "summary"]      Mark task as done
+  task delete <id>                              Delete a task
+  task info <id>                                Show task details
+  task kanban                                   Show kanban view
+
+Tips:
+  - Use --message with complete to save a summary to memory
+  - Always complete your task before ending a session!
 `);
     process.exit(1);
 }
