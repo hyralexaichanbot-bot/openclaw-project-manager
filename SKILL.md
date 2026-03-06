@@ -88,19 +88,17 @@ session list [--project <name>]
 ### Starting Work on a Project
 
 ```bash
-# 1. Switch to the project
+# 1. Switch to the project (auto-shows AGENTS.md context)
 project switch my-project
 
-# 2. Review context and memories
-memory context
-memory read
-
-# 3. See what needs to be done
+# 2. See what needs to be done
 task kanban
 
-# 4. Start a task
+# 3. Start a task (auto-shows AGENTS.md context)
 task move task-001 in-progress
 ```
+
+**Note:** Context is shown automatically from `AGENTS.md` (or `context.md` if AGENTS.md doesn't exist). No need to manually read files!
 
 ### During Work
 
@@ -146,11 +144,16 @@ All project data stored in: `~/dev/projects/`
 ~/dev/projects/
 ├── projects.json           # Master database (tasks, active project)
 ├── <project-name>/
+│   ├── AGENTS.md           # Agent instructions (auto-loaded)
 │   ├── context.md          # Project goals, stack, decisions
 │   ├── memory.md           # Project-specific learnings (append-only)
 │   └── sessions.json       # Attached session history
 └── ...
 ```
+
+**AGENTS.md** is automatically shown when:
+- Switching to a project (`project switch`)
+- Starting a task (`task move <id> in-progress`)
 
 ### projects.json Schema
 
