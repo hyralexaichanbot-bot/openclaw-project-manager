@@ -19,73 +19,58 @@ Available to all agents automatically.
 
 ## CLI Commands
 
-All commands are available via the `project-manager` CLI (symlinked to `pm` for convenience).
+All commands use the `pm` CLI.
+
+### Quick Commands
+
+```bash
+pm status                    # Show active project + task counts
+pm work <project>            # Switch project + show kanban (shortcut)
+pm help                      # Show all commands
+```
 
 ### Project Commands
 
 ```bash
-# List all projects
-project list
-
-# Create a new project
-project create <name>
-
-# Switch to a project (sets as active)
-project switch <name>
-
-# Show active project
-project active
-
-# Show project details
-project info [name]
+pm project list              # List all projects
+pm project create <name>     # Create a new project
+pm project switch <name>     # Switch to a project (sets as active)
+pm project active            # Show active project
+pm project info [name]       # Show project details
 ```
 
 ### Task Commands
 
 ```bash
-# Add a task
-task add "Build login form" [--project <name>]
-
-# List tasks (shows kanban if no status filter)
-task list [--project <name>] [--status todo|in-progress|done]
-
-# Move task to different status
-task move task-001 in-progress [--project <name>]
-
-# Mark task as complete
-task complete task-001 [--project <name>]
-
-# Delete a task
-task delete task-001 [--project <name>]
-
-# Show task details
-task info task-001 [--project <name>]
-
-# Show kanban board
-task kanban [--project <name>]
+pm task add "title" [--project <name>] [--skip-refinement]
+pm task list [--project <name>]
+pm task move <id> <status>   # status: todo, in-progress, done
+pm task complete <id> [--message "summary"]
+pm task delete <id>
+pm task info <id>
+pm task refine <id> [--force]
+pm task kanban [--project <name>]
 ```
+
+**Task Refinement:**
+- Tasks with short descriptions (<50 chars) are auto-refined using the LLM
+- Use `--skip-refinement` to create quick tasks without refinement
+- Use `pm task refine <id>` to manually refine an existing task
+- Use `--force` to re-refine an already refined task
 
 ### Memory Commands
 
 ```bash
-# Save a learning/memory
-memory save "Learned that HTMX is simpler than React for this use case" [--project <name>]
-
-# Read project memories
-memory read [--project <name>]
-
-# Read project context
-memory context [--project <name>]
+pm memory save "content" [--project <name>]
+pm memory read [--project <name>]
+pm memory context [--project <name>]
 ```
 
 ### Session Commands
 
 ```bash
-# Attach current session to project
-session attach <session-key> [--project <name>]
-
-# List attached sessions
-session list [--project <name>]
+pm session attach <key> [--project <name>]
+pm session list [--project <name>]
 ```
 
 ## Workflow
@@ -94,13 +79,13 @@ session list [--project <name>]
 
 ```bash
 # 1. Switch to the project (auto-shows AGENTS.md context)
-project switch my-project
+pm project switch my-project
 
 # 2. See what needs to be done
-task kanban
+pm task kanban
 
 # 3. Start a task (auto-shows AGENTS.md context)
-task move task-001 in-progress
+pm task move task-001 in-progress
 ```
 
 **Note:** Context is shown automatically from `AGENTS.md` (or `context.md` if AGENTS.md doesn't exist). No need to manually read files!
@@ -109,37 +94,37 @@ task move task-001 in-progress
 
 ```bash
 # Save important discoveries
-memory save "Learned that approach X works better than Y"
+pm memory save "Learned that approach X works better than Y"
 
 # Attach session for tracking
-session attach <session-key>
+pm session attach <session-key>
 ```
 
 ### Completing Work
 
 ```bash
 # Mark task done (with optional summary)
-task complete task-001 --message "Added UI form for task creation"
+pm task complete task-001 --message "Added UI form for task creation"
 
 # Or separately
-task complete task-001
-memory save "Completed session detail view with transcript and kill button"
+pm task complete task-001
+pm memory save "Completed session detail view with transcript and kill button"
 ```
 
-**Best Practice:** Always complete your task before ending a session! If you spawned for a specific task, run `task complete <id>` as your last action.
+**Best Practice:** Always complete your task before ending a session! If you spawned for a specific task, run `pm task complete <id>` as your last action.
 
 ### Switching Projects
 
 ```bash
 # Finish current project work
-task move task-005 in-progress  # if you left something mid-work
+pm task move task-005 in-progress  # if you left something mid-work
 
 # Switch to different project
-project switch python-anthemav
+pm project switch python-anthemav
 
 # Load context for new project
-memory context
-task kanban
+pm memory context
+pm task kanban
 ```
 
 ## Data Structure
@@ -160,8 +145,8 @@ All project data stored in: `~/dev/projects/`
 ```
 
 **AGENTS.md** is automatically shown when:
-- Switching to a project (`project switch`)
-- Starting a task (`task move <id> in-progress`)
+- Switching to a project (`pm project switch`)
+- Starting a task (`pm task move <id> in-progress`)
 
 ### projects.json Schema
 
@@ -286,47 +271,47 @@ pm task complete task-004 --message \"summary\"
 ### Example 1: Start New Project
 
 ```bash
-project create my-new-app
-project switch my-new-app
-task add "Set up project structure"
-task add "Create README"
-task kanban
+pm project create my-new-app
+pm project switch my-new-app
+pm task add "Set up project structure"
+pm task add "Create README"
+pm task kanban
 ```
 
 ### Example 2: Daily Workflow
 
 ```bash
 # Morning: check what you were working on
-project active
-task kanban
+pm project active
+pm task kanban
 
 # Start working
-task move task-003 in-progress
+pm task move task-003 in-progress
 
 # Lunch break - save progress
-memory save "Implemented user auth, need to add password reset"
+pm memory save "Implemented user auth, need to add password reset"
 
 # Afternoon: continue
-task complete task-003
-task move task-004 in-progress
+pm task complete task-003
+pm task move task-004 in-progress
 ```
 
 ### Example 3: Context Switch
 
 ```bash
 # Finishing work on a project
-task move task-010 in-progress
-session attach <session-key>
+pm task move task-010 in-progress
+pm session attach <session-key>
 
-# Switch to Home Assistant
-project switch another-project
-memory context
-task kanban
+# Switch to another project
+pm project switch another-project
+pm memory context
+pm task kanban
 
 # Work on a task
-task move task-005 in-progress
+pm task move task-005 in-progress
 
 # Later: switch back
-project switch my-project
-task info task-010  # See where you left off
+pm project switch my-project
+pm task info task-010  # See where you left off
 ```
