@@ -50,12 +50,19 @@ pm task delete <id>
 pm task info <id>
 pm task refine <id> [--force]
 pm task kanban [--project <name>]
+pm task archive [--project <name>] [--dry-run]  # Archive completed tasks
 ```
 
 **Task Refinement:**
 - Use `--skip-refinement` to create quick tasks without refinement
 - Use `pm task refine <id>` to manually refine an existing task
 - Use `--force` to re-refine an already refined task
+
+**Task Archive:**
+- Use `pm task archive` to move old completed tasks to archival
+- Keeps only the 10 most recent completed tasks in the main file
+- Archived tasks saved to `~/dev/projects/archived-tasks.json`
+- Use `--dry-run` to preview what would be archived
 
 ### Memory Commands
 
@@ -187,6 +194,7 @@ All project data stored in: `~/dev/projects/`
 ```
 ~/dev/projects/
 ├── projects.json           # Master database (tasks, active project)
+├── archived-tasks.json     # Archived completed tasks (keep last 10)
 ├── <project-name>/
 │   ├── AGENTS.md           # Agent instructions (auto-loaded)
 │   ├── context.md          # Project goals, stack, decisions
@@ -198,6 +206,8 @@ All project data stored in: `~/dev/projects/`
 **AGENTS.md** is automatically shown when:
 - Switching to a project (`pm project switch`)
 - Starting a task (`pm task move <id> in-progress`)
+
+**archived-tasks.json** contains completed tasks older than the 10 most recent, preserving full task history without cluttering the active file.
 
 ### projects.json Schema
 

@@ -443,13 +443,53 @@ switch (command) {
     
     projectName = getProjectName(projectName);
     const result = pm.attachSessionToTask(projectName, taskId, sessionKey, type);
-    
+
     console.log(`✓ Session attached to task ${taskId}`);
     console.log(`  Type: ${result.type}`);
     console.log(`  Session: ${result.sessionKey}`);
     break;
   }
-  
+
+  case 'archive': {
+    // task archive [--project <name>] [--dry-run]
+    let projectName = null;
+    let dryRun = false;
+
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--project' && args[i + 1]) {
+        projectName = args[++i];
+      } else if (args[i] === '--dry-run') {
+        dryRun = true;
+      }
+    }
+
+    projectName = getProjectName(projectName);
+    try {
+      const result = pm.archiveTasks(projectName, dryRun);
+
+      if (dryRun) {
+        console.log(`📦 Archive Preview for ${projectName}:`);
+        console.log(`   ${result.message}`);
+        if (result.toArchive && result.toArchive.length > 0) {
+          console.log('\n   Tasks that would be archived:');
+          result.toArchive.forEach(t => {
+            console.log(`     - ${t.id}: ${t.title} (completed: ${new Date(t.completedAt).toLocaleDateString()})`);
+          });
+        }
+        console.log(`\n   Tasks that would be kept: ${result.kept} most recent completed`);
+      } else {
+        console.log(`✓ ${result.message}`);
+        if (result.archivedTasks && result.archivedTasks.length > 0) {
+          console.log(`  Archived: ${result.archivedTasks.join(', ')}`);
+        }
+      }
+    } catch (e) {
+      console.error(e.message);
+      process.exit(1);
+    }
+    break;
+  }
+
   default:
     console.log(`
 Project Manager - Task Commands
@@ -464,6 +504,7 @@ Usage:
   task refine <id> [--force]                               Refine task description
   task kanban                                              Show kanban view
   task session attach <id> <key> [--type work|refinement]  Attach session to task
+  task archive [--project <name>] [--dry-run]              Archive completed tasks (keep last ${pm.MAX_COMPLETED_TO_KEEP})
 
 Session Tracking:
   - Attach your work session at the start: task session attach task-123 <session-key>
@@ -476,9 +517,15 @@ Refinement:
   - Use 'task refine' to manually refine an existing task
   - Use --force to re-refine an already refined task
 
+Archive:
+  - Moves completed tasks older than the last ${pm.MAX_COMPLETED_TO_KEEP} to archived-tasks.json
+  - Use --dry-run to preview what would be archived
+  - Archived tasks are preserved with project reference for future lookup
+
 Tips:
   - Use --message with complete to save a summary to memory
   - Always complete your task before ending a session!
+  - Run 'task archive --dry-run' to see what would be archived
 `);
     process.exit(1);
 }

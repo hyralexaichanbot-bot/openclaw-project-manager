@@ -69,6 +69,7 @@ Usage: pm <command> [subcommand] [args]
 Commands:
   project list|create|switch|active|info    Manage projects
   task add|list|move|complete|delete|kanban  Manage tasks
+  task archive [--dry-run]                   Archive completed tasks (keep last 10)
   memory save|read|context                   Manage memories
   session attach|list                        Track sessions
   status                                     Quick status
@@ -86,6 +87,7 @@ Examples:
   pm task move task-001 in-progress
   pm memory save "Learned something important"
   pm session attach <session-key>
+  pm task archive --dry-run
 `);
 }
 
