@@ -53,7 +53,6 @@ pm task kanban [--project <name>]
 ```
 
 **Task Refinement:**
-- Tasks with short descriptions (<50 chars) are auto-refined using the LLM
 - Use `--skip-refinement` to create quick tasks without refinement
 - Use `pm task refine <id>` to manually refine an existing task
 - Use `--force` to re-refine an already refined task
@@ -89,6 +88,58 @@ pm task move task-001 in-progress
 ```
 
 **Note:** Context is shown automatically from `AGENTS.md` (or `context.md` if AGENTS.md doesn't exist). No need to manually read files!
+
+### When Assigned a Task via TheNexus
+
+**Important:** When TheNexus assigns you a task, it does NOT automatically change the task status. **You are responsible for moving the task to in-progress** when you start working.
+
+```bash
+# When you receive a task assignment from TheNexus:
+# 1. Acknowledge the task
+# 2. Move it to in-progress (YOU do this, not TheNexus):
+pm task move task-001 in-progress --project <project-name>
+
+# 3. Start working on the task
+# 4. When done, complete it:
+pm task complete task-001 --project <project-name> --message "Summary of work completed"
+```
+
+**Why?** This ensures the agent is truly ready to work before the task status changes. TheNexus only sends the assignment; the agent controls the workflow.
+
+### When Assigned a Refinement Task via TheNexus
+
+**Refinement** is a separate status/column in the kanban board. Tasks flow: `todo` → `refinement` → `todo` → `in-progress` → `done`.
+
+When TheNexus assigns you a **refinement task**, your goal is to **enrich the task description** with context, technical approach, and acceptance criteria - NOT to implement the feature.
+
+```bash
+# When you receive a refinement assignment from TheNexus:
+
+# 1. Spawn a subagent in a Discord thread to do the refinement work
+#    (TheNexus routes to your Discord session, then you spawn threaded subagent)
+# 2. The subagent will:
+#    - Move task to refinement: pm task move task-001 refinement --project <project-name>
+#    - Gather context and research
+#    - Enrich the description with objective, approach, acceptance criteria
+#    - Mark complete: pm task refine task-001 --complete
+#    - Move back to todo: pm task move task-001 todo --project <project-name>
+
+# 3. Monitor the subagent - it will announce back when complete
+```
+
+**Key Principles:**
+- **Refinement is about planning/design, NOT implementation**
+- Use all available tools (code search, web, docs) to understand the problem
+- Ask questions early if requirements are unclear
+- Output should be actionable for the next agent
+- Keep refinement focused and concise
+- **On Discord: Spawn threaded subagents for isolated work (same as task execution)**
+
+**TheNexus UI Changes:**
+- Tasks in "refinement" status appear in the Refinement column
+- Click "Refine" on a todo task to assign an agent for refinement
+- Agent selection dropdown lets you choose which agent handles refinement
+- After refinement complete, task moves back to todo with enriched description
 
 ### During Work
 
@@ -200,32 +251,13 @@ TheNexus dashboard reads from `~/dev/projects/projects.json` to display:
 - ✅ Project isolation (no cross-contamination)
 - ✅ All agents share same data source
 
-## ⚠️ Task-Queue Skill Conflict (RESOLVED)
-
-**Problem:** The `task-queue` skill (for Tasker agent) was conflicting with project-manager because both use "task" terminology.
-
-**Solution:** The `task-queue` skill has been **disabled** (renamed to `task-queue.DISABLED`).
-
-**If you see confusion:**
-- `task-XXX` (lowercase) → Project Manager (THIS skill) ✅
-- `TASK-XXX` (uppercase) → Tasker Queue (DISABLED) ❌
-- `~/dev/projects/` → Project Manager ✅
-- `~/dev/task-agent/` → Tasker Queue ❌
-
-**To re-enable task-queue (not recommended):**
-```bash
-mv ~/.openclaw/skills/task-queue.DISABLED ~/.openclaw/skills/task-queue
-```
-
-But be aware this may cause confusion again!
-
 ## Spawning Subagents for Tasks
 
 When spawning a subagent to work on a project task, **always include**:
 
 1. **Full task description** (not just title)
 2. **Project context** (which project, task ID, location)
-3. **pm CLI instructions** (how to complete the task)
+3. **pm CLI instructions** (how to move task to in-progress and complete)
 4. **Explicit completion reminder** (run `pm task complete` when done)
 
 **Template:** See `SUBAGENT_TEMPLATE.md` for the full spawn template.
@@ -244,17 +276,50 @@ sessions_spawn --task "
 **Task ID:** task-004
 
 ## Available Commands
-pm task info task-004
+pm task move task-004 in-progress --project thenexus
 pm task complete task-004 --message \"summary\"
 
-## What to Do When Finished
-1. Test your work
-2. Run: pm task complete task-004 --message \"summary\"
-3. End your session
+## What to Do
+1. Move the task to in-progress: pm task move task-004 in-progress --project thenexus
+2. Work on the task
+3. When finished, run: pm task complete task-004 --message \"summary\"
+4. End your session
 "
 ```
 
-**Why this matters:** Subagents don't automatically know about the project-manager skill. They need explicit instructions on how to complete tasks and mark them done.
+**Why this matters:** Subagents don't automatically know about the project-manager skill. They need explicit instructions on how to:
+- Move the task to in-progress when they start working
+- Complete the task when they're done
+
+**Note:** TheNexus does NOT automatically move tasks to in-progress. The agent (or subagent) must do this themselves by calling `pm task move <id> in-progress`.
+
+### Discord Thread Binding
+
+**When running on Discord**, spawn subagents with `thread: true` to keep work isolated in a thread:
+
+```typescript
+sessions_spawn({
+  task: "...",
+  thread: true,  // Creates/binds to a Discord thread
+  mode: "session",  // Persistent session bound to the thread
+  label: "task-004-worker"
+})
+```
+
+**Benefits:**
+- Each task gets its own thread in the Discord channel
+- Follow-up messages in the thread route to the same subagent
+- Keeps the main channel clean while work happens in threads
+- Thread auto-unfocuses after inactivity (configurable via `/session idle`)
+
+**When to use threads:**
+- ✅ Task work that may have follow-up questions
+- ✅ Long-running work where you want to track progress in-thread
+- ✅ Multi-step tasks requiring back-and-forth
+
+**When threads aren't needed:**
+- Quick one-shot tasks (use `thread: false`, `mode: "run"`)
+- Non-Discord channels (thread binding is Discord-only)
 
 ## Future Enhancements
 

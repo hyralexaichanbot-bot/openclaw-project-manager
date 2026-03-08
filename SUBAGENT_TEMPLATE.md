@@ -4,28 +4,6 @@
 
 When spawning a subagent to work on a task from the **Project Manager** system (`~/dev/projects/`).
 
-## ⚠️ IMPORTANT: Not Task-Queue!
-
-**This is NOT the Tasker queue system!** There are two different task systems:
-
-| Project Manager (THIS) | Task-Queue (DISABLED) |
-|------------------------|----------------------|
-| `~/dev/projects/` | `~/dev/task-agent/` |
-| `pm` CLI commands | `tasker` commands |
-| Multi-project Kanban | Single queue for Tasker agent |
-| `projects.json` | `todo-queue.md` |
-| Tasks: `task-001`, `task-002` | Tasks: `TASK-001`, `TASK-002` |
-
-**If you see references to:**
-- `todo-queue.md` → Wrong system!
-- `TASK-XXX` (uppercase) → Wrong system!
-- `tasker` → Wrong system!
-
-**You should be using:**
-- `~/dev/projects/` → Correct!
-- `pm` commands → Correct!
-- `task-XXX` (lowercase) → Correct!
-
 ## Template Structure
 
 ```markdown
@@ -53,6 +31,9 @@ pm task info task-XXX
 # View project context (auto-shown when you start)
 pm project switch <project-name>
 
+# Attach your session to the task (do this first!)
+pm task session attach task-XXX <your-session-key>
+
 # Save learnings during work
 pm memory save "Learned that X works better than Y"
 
@@ -60,14 +41,23 @@ pm memory save "Learned that X works better than Y"
 pm task complete task-XXX --message "Brief summary of what you built"
 ```
 
-## What to Do When Finished
+## What to Do
 
-1. **Test your work** - Verify it actually works
-2. **Complete the task** - Run: `pm task complete task-XXX --message "summary"`
+**At Session Start:**
+1. **Attach your session** - Run: `pm task session attach task-XXX <your-session-key>`
+   - This links your work to the task for tracking
+   - Session will appear in task UI
+
+**During Work:**
+2. **Test your work** - Verify it actually works
+3. **Save learnings** - Use `pm memory save` for important discoveries
+
+**When Finished:**
+4. **Complete the task** - Run: `pm task complete task-XXX --message "summary"`
    - This marks the task as done
    - Saves your summary to project memory
    - Shows task duration and stats
-3. **End your session** - You're done!
+5. **End your session** - You're done!
 
 ## Technical Context
 
@@ -93,7 +83,6 @@ How to verify your work:
 ## Example: Task-004
 
 ```markdown
-**CRITICAL: You are working on TheNexus Project Manager tasks, NOT the Tasker queue!**
 
 **Task-004:** "Add the ability in the UI to start a task"
 
@@ -118,6 +107,9 @@ pm task info task-004
 
 # View project context (auto-shown when you start)
 pm project switch thenexus
+
+# Attach your session to the task (do this first!)
+pm task session attach task-004 <your-session-key>
 
 # Save learnings during work
 pm memory save "Learned that HTMX is simpler than React for this"
@@ -162,9 +154,10 @@ pm task complete task-004 --message "Added agent selection modal and subagent sp
 
 1. **Always include the FULL task description** - Not just the title
 2. **Explain the pm CLI** - Subagents don't automatically know about it
-3. **Tell them to complete the task** - Explicitly state this as the last step
-4. **Provide the exact command** - Make it copy-paste easy
-5. **Include technical context** - Tech stack, files, APIs, etc.
+3. **Attach session first** - Subagents should run `pm task session attach` at session start
+4. **Tell them to complete the task** - Explicitly state this as the last step
+5. **Provide the exact command** - Make it copy-paste easy
+6. **Include technical context** - Tech stack, files, APIs, etc.
 
 ## ⚠️ Testing Rule
 

@@ -30,6 +30,7 @@ function getStatusIcon(status) {
     case 'todo': return '○';
     case 'in-progress': return '◐';
     case 'done': return '●';
+    case 'refinement': return '⭐';
     default: return '?';
   }
 }
@@ -141,12 +142,12 @@ switch (command) {
     
     if (!taskId || !status) {
       console.error('Usage: task move <id> <status> [--project <name>]');
-      console.error('  Status: todo, in-progress, done');
+      console.error('  Status: todo, in-progress, refinement, done');
       process.exit(1);
     }
     
-    if (!['todo', 'in-progress', 'done'].includes(status)) {
-      console.error('Invalid status. Use: todo, in-progress, or done');
+    if (!['todo', 'in-progress', 'done', 'refinement'].includes(status)) {
+      console.error('Invalid status. Use: todo, in-progress, refinement, or done');
       process.exit(1);
     }
     
@@ -297,6 +298,12 @@ switch (command) {
     if (task.refined) {
       console.log(`  ✨ Refined: Yes (${new Date(task.refinedAt).toLocaleString()})`);
     }
+    if (task.workSessionKey) {
+      console.log(`  📀 Work Session: ${task.workSessionKey}`);
+    }
+    if (task.refinementSessionKey) {
+      console.log(`  ⭐ Refinement Session: ${task.refinementSessionKey}`);
+    }
     if (task.completedAt) {
       console.log(`  Completed: ${new Date(task.completedAt).toLocaleString()}`);
     }
@@ -377,6 +384,7 @@ switch (command) {
     projectName = getProjectName(projectName);
     const todo = pm.listTasks(projectName, 'todo');
     const inProgress = pm.listTasks(projectName, 'in-progress');
+    const refinement = pm.listTasks(projectName, 'refinement');
     const done = pm.listTasks(projectName, 'done');
     
     console.log(`\n📋 ${projectName.toUpperCase()} - Kanban\n`);
@@ -387,10 +395,58 @@ switch (command) {
     console.log(`\n🚧 IN PROGRESS (${inProgress.length})`);
     inProgress.forEach(t => console.log(`  ◐ ${t.id}: ${t.title}`));
     
+    console.log(`\n⭐ REFINEMENT (${refinement.length})`);
+    refinement.forEach(t => console.log(`  ⭐ ${t.id}: ${t.title}`));
+    
     console.log(`\n✅ DONE (${done.length})`);
     done.forEach(t => console.log(`  ● ${t.id}: ${t.title}`));
     
     console.log('');
+    break;
+  }
+  
+  case 'session': {
+    // task session attach <task-id> <session-key> [--type work|refinement] [--project <name>]
+    const subcommand = args[0];
+    
+    if (subcommand !== 'attach') {
+      console.error('Usage: task session attach <task-id> <session-key> [--type work|refinement] [--project <name>]');
+      process.exit(1);
+    }
+    
+    let projectName = null;
+    let taskId = null;
+    let sessionKey = null;
+    let type = 'work';
+    
+    for (let i = 1; i < args.length; i++) {
+      if (args[i] === '--project' && args[i + 1]) {
+        projectName = args[++i];
+      } else if (args[i] === '--type' && args[i + 1]) {
+        type = args[++i];
+      } else if (!taskId && !args[i].startsWith('--')) {
+        taskId = args[i];
+      } else if (!sessionKey && !args[i].startsWith('--')) {
+        sessionKey = args[i];
+      }
+    }
+    
+    if (!taskId || !sessionKey) {
+      console.error('Usage: task session attach <task-id> <session-key> [--type work|refinement] [--project <name>]');
+      process.exit(1);
+    }
+    
+    if (type !== 'work' && type !== 'refinement') {
+      console.error('Error: --type must be "work" or "refinement"');
+      process.exit(1);
+    }
+    
+    projectName = getProjectName(projectName);
+    const result = pm.attachSessionToTask(projectName, taskId, sessionKey, type);
+    
+    console.log(`✓ Session attached to task ${taskId}`);
+    console.log(`  Type: ${result.type}`);
+    console.log(`  Session: ${result.sessionKey}`);
     break;
   }
   
@@ -401,12 +457,18 @@ Project Manager - Task Commands
 Usage:
   task add "title" [--project <name>] [--skip-refinement]  Add a new task
   task list [--project <name>]                             List all tasks
-  task move <id> <status>                                  Move task (todo/in-progress/done)
+  task move <id> <status>                                  Move task (todo/in-progress/refinement/done)
   task complete <id> [--message "summary"]                 Mark task as done
   task delete <id>                                         Delete a task
   task info <id>                                           Show task details
   task refine <id> [--force]                               Refine task description
   task kanban                                              Show kanban view
+  task session attach <id> <key> [--type work|refinement]  Attach session to task
+
+Session Tracking:
+  - Attach your work session at the start: task session attach task-123 <session-key>
+  - Attach refinement session: task session attach task-123 <key> --type refinement
+  - Sessions are displayed in task cards and details UI
 
 Refinement:
   - Tasks with short descriptions (<50 chars) are auto-refined
