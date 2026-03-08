@@ -142,12 +142,12 @@ switch (command) {
     
     if (!taskId || !status) {
       console.error('Usage: task move <id> <status> [--project <name>]');
-      console.error('  Status: todo, in-progress, refinement, done');
+      console.error('  Status: todo, in-progress, refinement, review, done');
       process.exit(1);
     }
     
-    if (!['todo', 'in-progress', 'done', 'refinement'].includes(status)) {
-      console.error('Invalid status. Use: todo, in-progress, refinement, or done');
+    if (!['todo', 'in-progress', 'done', 'refinement', 'review'].includes(status)) {
+      console.error('Invalid status. Use: todo, in-progress, refinement, review, or done');
       process.exit(1);
     }
     
@@ -385,6 +385,7 @@ switch (command) {
     const todo = pm.listTasks(projectName, 'todo');
     const inProgress = pm.listTasks(projectName, 'in-progress');
     const refinement = pm.listTasks(projectName, 'refinement');
+    const review = pm.listTasks(projectName, 'review');
     const done = pm.listTasks(projectName, 'done');
     
     console.log(`\n📋 ${projectName.toUpperCase()} - Kanban\n`);
@@ -397,6 +398,9 @@ switch (command) {
     
     console.log(`\n⭐ REFINEMENT (${refinement.length})`);
     refinement.forEach(t => console.log(`  ⭐ ${t.id}: ${t.title}`));
+    
+    console.log(`\n👁️ REVIEW (${review.length})`);
+    review.forEach(t => console.log(`  ◑ ${t.id}: ${t.title}`));
     
     console.log(`\n✅ DONE (${done.length})`);
     done.forEach(t => console.log(`  ● ${t.id}: ${t.title}`));
