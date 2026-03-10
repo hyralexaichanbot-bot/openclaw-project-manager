@@ -11,6 +11,32 @@ Multi-project task and memory management for OpenClaw agents.
 
 Manage multiple projects simultaneously with isolated context, tasks, and memories. Enables seamless context switching between projects while maintaining full history and learnings for each.
 
+## Architecture
+
+**TheNexus API Integration:**
+
+The pm tool now uses TheNexus API (`http://localhost:3000/api/*`) as the primary data source, eliminating race conditions with direct JSON writes.
+
+- **Primary:** All task/project operations go through TheNexus API
+- **Fallback:** If API is unavailable, falls back to direct JSON writes with atomic operations
+- **Single Source of Truth:** TheNexus → SQLite (when implemented)
+
+**API Endpoints Used:**
+- `POST /api/tasks` - Create task
+- `PUT /api/tasks/:id` - Update task
+- `PATCH /api/tasks/:id` - Partial update (status, etc.)
+- `DELETE /api/tasks/:id` - Delete task
+- `POST /api/projects` - Create project
+- `PUT /api/projects/active` - Set active project
+- `GET /api/tasks` - List tasks
+- `GET /api/projects` - List projects
+
+**Offline Mode:**
+When TheNexus API is unreachable (timeout > 2s), the pm tool automatically:
+1. Logs a warning: `⚠️ TheNexus API unavailable, falling back to direct JSON write`
+2. Uses atomic JSON writes with backup (`projects.json.bak`)
+3. Queues changes for sync when API becomes available (future enhancement)
+
 ## Installation
 
 This skill lives at: `~/.openclaw/skills/project-manager/`
