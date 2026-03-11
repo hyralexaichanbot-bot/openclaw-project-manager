@@ -213,12 +213,59 @@ async function main() {
       
       projectName = await getProjectName(projectName);
       try {
-        const task = await pm.moveTask(projectName, taskId, 'done');
-        console.log(`✓ Task ${task.id} completed!`);
+        const task = await pm.moveTask(projectName, taskId, 'review');
+        console.log(`✓ Task ${task.id} moved to review!`);
         
         // If message provided, save to project memory
         if (message) {
           await pm.addMemory(projectName, `Completed ${taskId}: ${message}`);
+          console.log(`✓ Memory saved: ${message}`);
+        }
+        
+        // Show completion summary
+        const duration = new Date(task.updatedAt) - new Date(task.createdAt);
+        const hours = Math.floor(duration / 3600000);
+        const mins = Math.floor((duration % 3600000) / 60000);
+        console.log(`\n📊 Task Summary:`);
+        console.log(`   Duration: ${hours > 0 ? hours + 'h ' : ''}${mins}m`);
+        console.log(`   Status: ${task.status}`);
+        console.log(`\n⚠️  Task is now in review. Run 'pm task approve ${taskId}' to mark as done.`);
+      } catch (e) {
+        console.error(e.message);
+        process.exit(1);
+      }
+      break;
+    }
+    
+    case 'approve': {
+      // task approve <id> [--project <name>] [--message "approval note"]
+      let projectName = null;
+      let taskId = null;
+      let message = null;
+      
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--project' && args[i + 1]) {
+          projectName = args[++i];
+        } else if (args[i] === '--message' && args[i + 1]) {
+          message = args[++i];
+        } else if (!taskId && !args[i].startsWith('--')) {
+          taskId = args[i];
+        }
+      }
+      
+      if (!taskId) {
+        console.error('Usage: task approve <id> [--project <name>] [--message "approval note"]');
+        process.exit(1);
+      }
+      
+      projectName = await getProjectName(projectName);
+      try {
+        const task = await pm.moveTask(projectName, taskId, 'done');
+        console.log(`✓ Task ${task.id} approved and marked as done!`);
+        
+        // If approval message provided, save to project memory
+        if (message) {
+          await pm.addMemory(projectName, `Approved ${taskId}: ${message}`);
           console.log(`✓ Memory saved: ${message}`);
         }
         
