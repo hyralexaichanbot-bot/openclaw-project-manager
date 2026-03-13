@@ -283,6 +283,53 @@ async function main() {
       break;
     }
     
+    case 'flag': {
+      // pm task flag <id> refined|done|reviewed
+      let projectName = null;
+      let taskId = null;
+      let flagName = null;
+      
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--project' && args[i + 1]) {
+          projectName = args[++i];
+        } else if (!taskId && !args[i].startsWith('--')) {
+          taskId = args[i];
+        } else if (!flagName && !args[i].startsWith('--')) {
+          flagName = args[i];
+        }
+      }
+      
+      if (!taskId || !flagName) {
+        console.error('Usage: task flag <id> refined|done|reviewed [--project <name>]');
+        process.exit(1);
+      }
+      
+      const validFlags = ['refined', 'done', 'reviewed'];
+      if (!validFlags.includes(flagName)) {
+        console.error(`Invalid flag. Use: ${validFlags.join(', ')}`);
+        process.exit(1);
+      }
+      
+      projectName = await getProjectName(projectName);
+      try {
+        const response = await fetch(`http://localhost:3000/api/tasks/${taskId}/set-${flagName}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        if (result.success) {
+          console.log(`✅ Flag '${flagName}' set on ${taskId}`);
+        } else {
+          console.error(`Error: ${result.error}`);
+          process.exit(1);
+        }
+      } catch (e) {
+        console.error(`Error: ${e.message}`);
+        process.exit(1);
+      }
+      break;
+    }
+    
     case 'delete':
     case 'rm': {
       // task delete <id> [--project <name>]
@@ -557,6 +604,7 @@ Usage:
   task kanban                                              Show kanban view
   task session attach <id> <key> [--type work|refinement]  Attach session to task
   task archive [--project <name>] [--dry-run] [--per-project]  Archive completed tasks (global: keep last 10 across all projects)
+  task flag <id> refined|done|reviewed                     Set completion flag (triggers auto-transition)
 
 Session Tracking:
   - Attach your work session at the start: task session attach task-123 <session-key>
@@ -574,6 +622,12 @@ Archive:
   - Use --per-project: keeps last 10 completed tasks PER PROJECT (legacy)
   - Use --dry-run to preview what would be archived
   - Archived tasks are preserved with project reference for future lookup
+
+Task Flags (Auto-Transition):
+  - Use 'task flag <id> refined' instead of moving status manually
+  - Use 'task flag <id> done' to mark work complete (moves to review)
+  - Use 'task flag <id> reviewed' to mark review complete (moves to done)
+  - Flags trigger automatic status transitions via TheNexus
 
 Tips:
   - Use --message with complete to save a summary to memory

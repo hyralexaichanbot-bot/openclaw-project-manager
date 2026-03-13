@@ -1,11 +1,11 @@
 ---
 name: project-manager
-description: "Multi-project task and memory management for OpenClaw agents. Create projects, switch contexts, manage tasks with kanban, and save project-specific memories."
+description: "Multi-project task and memory management via TheNexus API. Create projects, manage tasks with kanban, and save project-specific memories."
 ---
 
-# Project Manager Skill
+# TheNexus - Project Manager Skill
 
-Multi-project task and memory management for OpenClaw agents.
+Multi-project task and memory management for OpenClaw agents via TheNexus API.
 
 ## Purpose
 
@@ -13,114 +13,224 @@ Manage multiple projects simultaneously with isolated context, tasks, and memori
 
 ## Architecture
 
-**TheNexus API Integration:**
+**TheNexus API:**
 
-The pm tool now uses TheNexus API (`http://localhost:3000/api/*`) as the primary data source, eliminating race conditions with direct JSON writes.
+All task and project operations use TheNexus API (`http://localhost:3000/api/*`). Data is stored in SQLite with automatic backups.
 
-- **Primary:** All task/project operations go through TheNexus API
-- **Fallback:** If API is unavailable, falls back to direct JSON writes with atomic operations
-- **Single Source of Truth:** TheNexus → SQLite (when implemented)
+- **Single Source of Truth:** TheNexus → SQLite database
+- **No local files:** All data accessed via API
+- **Real-time updates:** WebSocket pushes changes to UI
 
-**API Endpoints Used:**
-- `POST /api/tasks` - Create task
-- `PUT /api/tasks/:id` - Update task
-- `PATCH /api/tasks/:id` - Partial update (status, etc.)
-- `DELETE /api/tasks/:id` - Delete task
-- `POST /api/projects` - Create project
-- `PUT /api/projects/active` - Set active project
-- `GET /api/tasks` - List tasks
-- `GET /api/projects` - List projects
+**TheNexus Server:**
+- URL: `http://localhost:3000`
+- Health: `http://localhost:3000/api/health`
+- Database: `/home/azureuser/dev/TheNexus/nexus.db`
 
-**Offline Mode:**
-When TheNexus API is unreachable (timeout > 2s), the pm tool automatically:
-1. Logs a warning: `⚠️ TheNexus API unavailable, falling back to direct JSON write`
-2. Uses atomic JSON writes with backup (`projects.json.bak`)
-3. Queues changes for sync when API becomes available (future enhancement)
-
-## Installation
-
-This skill lives at: `~/.openclaw/skills/project-manager/`
-
-Available to all agents automatically.
-
-## CLI Commands
-
-All commands use the `pm` CLI.
-
-### Quick Commands
-
+**If API is unavailable:**
 ```bash
-pm status                    # Show active project + task counts
-pm work <project>            # Switch project + show kanban (shortcut)
-pm help                      # Show all commands
+# Check if TheNexus is running
+curl http://localhost:3000/api/health
+
+# Expected response:
+# {"status":"healthy","timestamp":"...","uptime":12345}
+
+# If connection refused or error:
+# "TheNexus API is not running. Start it with: sudo systemctl start thenexus"
 ```
 
-### Project Commands
+---
 
-```bash
-pm project list              # List all projects
-pm project create <name>     # Create a new project
-pm project switch <name>     # Switch to a project (sets as active)
-pm project active            # Show active project
-pm project info [name]       # Show project details
+## TheNexus API Reference
+
+### Base URL
+```
+http://localhost:3000/api
 ```
 
-### Task Commands
+### Projects
 
+**List all projects:**
 ```bash
-pm task add "title" [--project <name>] [--skip-refinement]
-pm task list [--project <name>]
-pm task move <id> <status>   # status: todo, in-progress, done
-pm task complete <id> [--message "summary"]
-pm task delete <id>
-pm task info <id>
-pm task refine <id> [--force]
-pm task kanban [--project <name>]
-pm task archive [--project <name>] [--dry-run]  # Archive completed tasks
+curl http://localhost:3000/api/projects
 ```
 
-**Task Refinement:**
-- Use `--skip-refinement` to create quick tasks without refinement
-- Use `pm task refine <id>` to manually refine an existing task
-- Use `--force` to re-refine an already refined task
-
-**Task Archive:**
-- Use `pm task archive` to move old completed tasks to archival
-- Keeps only the 10 most recent completed tasks in the main file
-- Archived tasks saved to `~/dev/projects/archived-tasks.json`
-- Use `--dry-run` to preview what would be archived
-
-### Memory Commands
-
+**Get single project:**
 ```bash
-pm memory save "content" [--project <name>]
-pm memory read [--project <name>]
-pm memory context [--project <name>]
+curl http://localhost:3000/api/projects/<project-name>
 ```
 
-### Session Commands
-
+**Create project:**
 ```bash
-pm session attach <key> [--project <name>]
-pm session list [--project <name>]
+curl -X POST http://localhost:3000/api/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-project","description":"Optional description"}'
 ```
+
+**Update active project:**
+```bash
+curl -X PUT http://localhost:3000/api/projects/active \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-project"}'
+```
+
+### Tasks
+
+**List all tasks (with optional filters):**
+```bash
+# All tasks
+curl http://localhost:3000/api/tasks
+
+# Filter by project
+curl "http://localhost:3000/api/tasks?project=thenexus"
+
+# Filter by status
+curl "http://localhost:3000/api/tasks?status=in-progress"
+
+# Filter by both
+curl "http://localhost:3000/api/tasks?project=thenexus&status=todo"
+```
+
+**Get single task:**
+```bash
+curl http://localhost:3000/api/tasks/task-001
+```
+
+**Create task:**
+```bash
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Fix the bug",
+    "description": "Optional detailed description",
+    "project": "thenexus",
+    "priority": "high",
+    "tags": ["bug", "urgent"]
+  }'
+```
+
+**Update task (full update):**
+```bash
+curl -X PUT http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Updated title",
+    "description": "Updated description",
+    "priority": "medium",
+    "tags": ["bug"],
+    "project": "thenexus"
+  }'
+```
+
+**Attach session to task:**
+```bash
+curl -X PUT http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
+    "project": "thenexus"
+  }'
+```
+
+**Delete task:**
+```bash
+curl -X DELETE http://localhost:3000/api/tasks/task-001
+```
+
+### Session Attachment
+
+**Why attach sessions:** Links agent work sessions to specific tasks for tracking and audit trail.
+
+**When to attach:**
+- When starting work on a task
+- After spawning a subagent for a task
+
+**How to attach:**
+```bash
+# Get your session key
+openclaw status
+
+# Attach to task
+curl -X PUT http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"sessionKey":"agent:coder:discord:channel:1476147784477315155","project":"thenexus"}'
+```
+
+**Session key format:** `agent:<agent-id>:<channel-type>:<channel-id>`
+
+Examples:
+- `agent:coder:discord:channel:1476147784477315155`
+- `agent:main:discord:channel:1474992984247238879`
+- `agent:coder:subagent:<uuid>`
+
+### Agents
+
+**List available agents:**
+```bash
+curl http://localhost:3000/api/agents
+```
+
+**Start task with agent (via UI):**
+```bash
+curl -X POST http://localhost:3000/api/tasks/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "taskId": "task-001",
+    "agentId": "coder",
+    "project": "thenexus"
+  }'
+```
+
+**Start refinement (explicit):**
+```bash
+curl -X POST http://localhost:3000/api/tasks/task-001/start-refinement \
+  -H "Content-Type: application/json" \
+  -d '{
+    "agentId": "lyra",
+    "project": "thenexus"
+  }'
+```
+
+### Error Responses
+
+**404 Not Found:**
+```json
+{"error": "Task 'task-999' not found"}
+```
+
+**400 Bad Request:**
+```json
+{"error": "Title and project are required"}
+```
+
+**500 Server Error:**
+```json
+{"error": "Database error message"}
+```
+
+---
 
 ## Workflow
 
 ### Starting Work on a Project
 
+**Using TheNexus API:**
 ```bash
-# 1. Switch to the project (auto-shows AGENTS.md context)
-pm project switch my-project
+# Switch active project
+curl -X PUT http://localhost:3000/api/projects/active \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-project"}'
 
-# 2. See what needs to be done
-pm task kanban
+# Get tasks for project
+curl "http://localhost:3000/api/tasks?project=my-project"
 
-# 3. Start a task (auto-shows AGENTS.md context)
-pm task move task-001 in-progress
+# Attach your session
+curl -X PUT http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
+    "project": "my-project"
+  }'
 ```
-
-**Note:** Context is shown automatically from `AGENTS.md` (or `context.md` if AGENTS.md doesn't exist). No need to manually read files!
 
 ### When Assigned a Task via TheNexus
 
@@ -129,15 +239,29 @@ pm task move task-001 in-progress
 ```bash
 # When you receive a task assignment from TheNexus:
 # 1. Acknowledge the task
-# 2. Move it to in-progress (YOU do this, not TheNexus):
-pm task move task-001 in-progress --project <project-name>
 
-# 3. Start working on the task
-# 4. When done, complete it:
-pm task complete task-001 --project <project-name> --message "Summary of work completed"
+# 2. Move it to in-progress:
+curl -X PATCH http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"in-progress"}'
+
+# 3. Attach your session (for tracking)
+curl -X PUT http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
+    "project": "thenexus"
+  }'
+
+# 4. Start working on the task
+
+# 5. When done, mark complete:
+curl -X PATCH http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"done"}'
 ```
 
-**Why?** This ensures the agent is truly ready to work before the task status changes. TheNexus only sends the assignment; the agent controls the workflow.
+**Get your session key:** Run `openclaw status` or check the session context at the top of your conversation.
 
 ### When Assigned a Refinement Task via TheNexus
 
@@ -145,19 +269,26 @@ pm task complete task-001 --project <project-name> --message "Summary of work co
 
 When TheNexus assigns you a **refinement task**, your goal is to **enrich the task description** with context, technical approach, and acceptance criteria - NOT to implement the feature.
 
+**Automatic Refinement Trigger:**
+- **Moving any task to "refinement" status automatically spawns Lyra** (the default refinement agent)
+- This happens whether you use the UI, API, or any other method
+- The agent will enrich the description and move the task back to "todo" when complete
+
+**Using TheNexus API:**
 ```bash
-# When you receive a refinement assignment from TheNexus:
+# Move task to refinement (automatically spawns Lyra)
+curl -X PATCH http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"refinement"}'
 
-# 1. Spawn a subagent in a Discord thread to do the refinement work
-#    (TheNexus routes to your Discord session, then you spawn threaded subagent)
-# 2. The subagent will:
-#    - Move task to refinement: pm task move task-001 refinement --project <project-name>
-#    - Gather context and research
-#    - Enrich the description with objective, approach, acceptance criteria
-#    - Mark complete: pm task refine task-001 --complete
-#    - Move back to todo: pm task move task-001 todo --project <project-name>
+# OR use the dedicated refinement endpoint (specify agent)
+curl -X POST http://localhost:3000/api/tasks/task-001/start-refinement \
+  -H "Content-Type: application/json" \
+  -d '{"agentId":"lyra","project":"thenexus"}'
 
-# 3. Monitor the subagent - it will announce back when complete
+# After enrichment complete, task moves back to todo automatically
+# You can verify with:
+curl http://localhost:3000/api/tasks/task-001
 ```
 
 **Key Principles:**
@@ -166,126 +297,145 @@ When TheNexus assigns you a **refinement task**, your goal is to **enrich the ta
 - Ask questions early if requirements are unclear
 - Output should be actionable for the next agent
 - Keep refinement focused and concise
-- **On Discord: Spawn threaded subagents for isolated work (same as task execution)**
 
-**TheNexus UI Changes:**
+**TheNexus UI:**
 - Tasks in "refinement" status appear in the Refinement column
 - Click "Refine" on a todo task to assign an agent for refinement
-- Agent selection dropdown lets you choose which agent handles refinement
+- Agent selection dropdown defaults to Lyra (Product Manager)
 - After refinement complete, task moves back to todo with enriched description
-
-### During Work
-
-```bash
-# Save important discoveries
-pm memory save "Learned that approach X works better than Y"
-
-# Attach session for tracking
-pm session attach <session-key>
-```
 
 ### Completing Work
 
 ```bash
-# Mark task done (with optional summary)
-pm task complete task-001 --message "Added UI form for task creation"
-
-# Or separately
-pm task complete task-001
-pm memory save "Completed session detail view with transcript and kill button"
+# Mark task done
+curl -X PATCH http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"done"}'
 ```
 
-**Best Practice:** Always complete your task before ending a session! If you spawned for a specific task, run `pm task complete <id>` as your last action.
+**Best Practice:** Always complete your task before ending a session!
 
-### Switching Projects
+---
+
+## Task Flags
+
+Set completion flags instead of changing status:
 
 ```bash
-# Finish current project work
-pm task move task-005 in-progress  # if you left something mid-work
+# Mark refinement complete (auto-moves to in-progress)
+pm task flag <id> refined
 
-# Switch to different project
-pm project switch python-anthemav
+# Mark work complete (auto-moves to review)
+pm task flag <id> done
 
-# Load context for new project
-pm memory context
-pm task kanban
+# Mark review complete (auto-moves to done)
+pm task flag <id> reviewed
 ```
+
+## Task Types
+
+Create tasks with appropriate type:
+
+```bash
+pm task add "Fix bug" --type coding
+pm task add "Research API" --type research
+```
+
+## Status Changes (Manual)
+
+Only use for backlog management:
+
+```bash
+pm task move <id> todo
+pm task move <id> refinement
+pm task move <id> in-progress
+pm task move <id> review
+pm task move <id> done
+```
+
+**Note:** Status changes clear the worker_agent field.
+
+---
 
 ## Data Structure
 
-### Location
+### TheNexus Storage
 
-All project data stored in: `~/dev/projects/`
+**Primary:** SQLite database at `/home/azureuser/dev/TheNexus/nexus.db`
 
-```
-~/dev/projects/
-├── projects.json           # Master database (tasks, active project)
-├── archived-tasks.json     # Archived completed tasks (keep last 10)
-├── <project-name>/
-│   ├── AGENTS.md           # Agent instructions (auto-loaded)
-│   ├── context.md          # Project goals, stack, decisions
-│   ├── memory.md           # Project-specific learnings (append-only)
-│   └── sessions.json       # Attached session history
-└── ...
+**Tables:**
+- `projects` - Project metadata
+- `tasks` - All tasks with status, sessions, etc.
+- `memories` - Project-specific memories
+
+**Backup:** TheNexus maintains automatic backups. Manual backup:
+```bash
+cp /home/azureuser/dev/TheNexus/nexus.db /home/azureuser/dev/TheNexus/nexus.db.bak
 ```
 
-**AGENTS.md** is automatically shown when:
-- Switching to a project (`pm project switch`)
-- Starting a task (`pm task move <id> in-progress`)
-
-**archived-tasks.json** contains completed tasks older than the 10 most recent, preserving full task history without cluttering the active file.
-
-### projects.json Schema
+### Task Schema
 
 ```json
 {
-  "projects": {
-    "my-project": {
-      "name": "my-project",
-      "path": "~/dev/projects/my-project",
-      "active": true,
-      "createdAt": "2026-03-06T08:00:00Z",
-      "tasks": [
-        {
-          "id": "task-001",
-          "title": "Build feature",
-          "description": "Description here",
-          "status": "done",
-          "createdAt": "2026-03-06T08:00:00Z",
-          "updatedAt": "2026-03-06T20:00:00Z",
-          "completedAt": "2026-03-06T20:00:00Z"
-        }
-      ]
-    }
-  },
-  "activeProject": "my-project"
+  "id": "task-001",
+  "projectName": "thenexus",
+  "title": "Build feature",
+  "description": "Description here",
+  "status": "done",
+  "priority": "high",
+  "tags": ["feature", "ui"],
+  "createdAt": "2026-03-06T08:00:00Z",
+  "updatedAt": "2026-03-06T20:00:00Z",
+  "startedAt": "2026-03-06T10:00:00Z",
+  "completedAt": "2026-03-06T20:00:00Z",
+  "refined": true,
+  "refinedAt": "2026-03-06T09:00:00Z",
+  "refinedBy": "agent:coder:manual-refine",
+  "assignedAgent": "coder",
+  "sessionKey": "agent:coder:discord:channel:1476147784477315155",
+  "refinementSessionKey": null
 }
 ```
 
+---
+
 ## Integration with TheNexus UI
 
-TheNexus dashboard reads from `~/dev/projects/projects.json` to display:
+**TheNexus Dashboard:** `http://localhost:3000`
+
+TheNexus reads from SQLite database to display:
 
 - Project list with task counts
-- Kanban board per project
-- Task status updates
-- Session history
+- Kanban board per project (todo, refinement, in-progress, done columns)
+- Task details with sessions attached
+- Agent activity and session history
+- Real-time updates via WebSocket
+
+**UI Features:**
+- Click tasks to view/edit details
+- Drag tasks between status columns
+- Filter by project, status, tags
+- Start tasks with specific agents
+- View session transcripts
+- Create tasks with refinement option
+
+**API + UI relationship:**
+- API → SQLite database
+- UI → SQLite database → Real-time display
+- Both can be used interchangeably
+- Changes via API immediately visible in UI
+
+---
 
 ## Best Practices
 
-1. **Always switch projects before working** - Ensures tasks go to right project
-2. **Save memories liberally** - Future-you will thank you
-3. **Attach sessions** - Track which sessions worked on which projects
-4. **Use descriptive task titles** - "Fix login bug" not "Fix bug"
-5. **Move tasks promptly** - Keep kanban accurate
-6. **Review context when switching** - Refresh your memory on project goals
+1. **Always attach sessions** - Track which sessions worked on which projects
+2. **Use descriptive task titles** - "Fix login bug" not "Fix bug"
+3. **Move tasks promptly** - Keep kanban accurate
+4. **Review context when switching** - Refresh your memory on project goals
+5. **Check API health if issues occur** - `curl http://localhost:3000/api/health`
 
-## Multi-Agent Safety
-
-- ✅ Atomic JSON writes (no race conditions)
-- ✅ Auto-incrementing task IDs (per project)
-- ✅ Project isolation (no cross-contamination)
-- ✅ All agents share same data source
+---
 
 ## Spawning Subagents for Tasks
 
@@ -293,126 +443,78 @@ When spawning a subagent to work on a project task, **always include**:
 
 1. **Full task description** (not just title)
 2. **Project context** (which project, task ID, location)
-3. **pm CLI instructions** (how to move task to in-progress and complete)
-4. **Explicit completion reminder** (run `pm task complete` when done)
-
-**Template:** See `SUBAGENT_TEMPLATE.md` for the full spawn template.
+3. **API instructions** (how to move task to in-progress and complete)
+4. **Explicit completion reminder** (run status update when done)
 
 **Example:**
 ```bash
-# Spawn subagent for task-004
-sessions_spawn --task "
-**Task-004:** \"Add the ability in the UI to start a task\"
-
-**Full Description:**
-\"The card should allow to start a task in todo. We need to be able to choose the agent that should run the task, and then the agent should wake up and do the task\"
-
-## Project Context
+# Spawn subagent with task context
+openclaw agent --agent coder --message "
+**Task:** task-001 - Fix the bug
 **Project:** thenexus
-**Task ID:** task-004
 
-## Available Commands
-pm task move task-004 in-progress --project thenexus
-pm task complete task-004 --message \"summary\"
+**Instructions:**
+1. Move task to in-progress:
+   curl -X PATCH http://localhost:3000/api/tasks/task-001 \\
+     -H 'Content-Type: application/json' \\
+     -d '{\"status\":\"in-progress\"}'
 
-## What to Do
-1. Move the task to in-progress: pm task move task-004 in-progress --project thenexus
-2. Work on the task
-3. When finished, run: pm task complete task-004 --message \"summary\"
-4. End your session
+2. Attach your session:
+   curl -X PUT http://localhost:3000/api/tasks/task-001 \\
+     -H 'Content-Type: application/json' \\
+     -d '{\"sessionKey\":\"<your-session-key>\",\"project\":\"thenexus\"}'
+
+3. Work on the task
+
+4. When done, mark complete:
+   curl -X PATCH http://localhost:3000/api/tasks/task-001 \\
+     -H 'Content-Type: application/json' \\
+     -d '{\"status\":\"done\"}'
 "
 ```
 
-**Why this matters:** Subagents don't automatically know about the project-manager skill. They need explicit instructions on how to:
-- Move the task to in-progress when they start working
-- Complete the task when they're done
+---
 
-**Note:** TheNexus does NOT automatically move tasks to in-progress. The agent (or subagent) must do this themselves by calling `pm task move <id> in-progress`.
+## Troubleshooting
 
-### Discord Thread Binding
+**TheNexus API not responding:**
+```bash
+# Check if running
+curl http://localhost:3000/api/health
 
-**When running on Discord**, spawn subagents with `thread: true` to keep work isolated in a thread:
+# If connection refused:
+sudo systemctl status thenexus
+sudo systemctl start thenexus
 
-```typescript
-sessions_spawn({
-  task: "...",
-  thread: true,  // Creates/binds to a Discord thread
-  mode: "session",  // Persistent session bound to the thread
-  label: "task-004-worker"
-})
+# Check logs
+journalctl -u thenexus --no-pager -n 50
 ```
 
-**Benefits:**
-- Each task gets its own thread in the Discord channel
-- Follow-up messages in the thread route to the same subagent
-- Keeps the main channel clean while work happens in threads
-- Thread auto-unfocuses after inactivity (configurable via `/session idle`)
+**Task not found:**
+- Verify task ID is correct (format: `task-XXX`)
+- Check task exists: `curl http://localhost:3000/api/tasks/task-XXX`
+- Verify project name matches
 
-**When to use threads:**
-- ✅ Task work that may have follow-up questions
-- ✅ Long-running work where you want to track progress in-thread
-- ✅ Multi-step tasks requiring back-and-forth
+**Session not attaching:**
+- Verify session key format: `agent:<agent-id>:<channel-type>:<channel-id>`
+- Get your session: `openclaw status`
+- Check task exists before attaching
 
-**When threads aren't needed:**
-- Quick one-shot tasks (use `thread: false`, `mode: "run"`)
-- Non-Discord channels (thread binding is Discord-only)
+**Refinement not triggering:**
+- Ensure status is exactly `"refinement"` (case-sensitive)
+- Check Lyra agent is available: `curl http://localhost:3000/api/agents`
+- Review logs: `journalctl -u thenexus --no-pager -n 100`
 
-## Future Enhancements
+---
 
-- [ ] Drag-and-drop kanban in TheNexus UI
-- [ ] Task dependencies
-- [ ] Time tracking per task
-- [ ] GitHub issue sync
-- [ ] Automatic session attachment (detect project from cwd)
-- [ ] Task templates
-- [ ] Export/import projects
+## Environment Variables
 
-## Examples
-
-### Example 1: Start New Project
+**Optional configuration:**
 
 ```bash
-pm project create my-new-app
-pm project switch my-new-app
-pm task add "Set up project structure"
-pm task add "Create README"
-pm task kanban
-```
+# Default refinement agent (default: lyra)
+REFINEMENT_DEFAULT_AGENT=lyra
 
-### Example 2: Daily Workflow
-
-```bash
-# Morning: check what you were working on
-pm project active
-pm task kanban
-
-# Start working
-pm task move task-003 in-progress
-
-# Lunch break - save progress
-pm memory save "Implemented user auth, need to add password reset"
-
-# Afternoon: continue
-pm task complete task-003
-pm task move task-004 in-progress
-```
-
-### Example 3: Context Switch
-
-```bash
-# Finishing work on a project
-pm task move task-010 in-progress
-pm session attach <session-key>
-
-# Switch to another project
-pm project switch another-project
-pm memory context
-pm task kanban
-
-# Work on a task
-pm task move task-005 in-progress
-
-# Later: switch back
-pm project switch my-project
-pm task info task-010  # See where you left off
+# TheNexus URL (default: http://localhost:3000)
+THENEXUS_URL=http://localhost:3000
 ```
