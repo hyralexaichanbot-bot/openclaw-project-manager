@@ -121,6 +121,13 @@ curl -X PUT http://localhost:3000/api/tasks/task-001 \
   }'
 ```
 
+**Change task status:**
+```bash
+curl -X PATCH http://localhost:3000/api/tasks/task-001 \
+  -H "Content-Type: application/json" \
+  -d '{"status":"in-progress"}'
+```
+
 **Attach session to task:**
 ```bash
 curl -X PUT http://localhost:3000/api/tasks/task-001 \
@@ -134,6 +141,21 @@ curl -X PUT http://localhost:3000/api/tasks/task-001 \
 **Delete task:**
 ```bash
 curl -X DELETE http://localhost:3000/api/tasks/task-001
+```
+
+### Task Flags (Auto-Transition)
+
+Set completion flags instead of changing status manually. Flags trigger automatic status transitions.
+
+```bash
+# Mark refinement complete (auto-moves to in-progress)
+curl -X PUT http://localhost:3000/api/tasks/task-001/set-refined
+
+# Mark work complete (auto-moves to review)
+curl -X PUT http://localhost:3000/api/tasks/task-001/set-done
+
+# Mark review complete (auto-moves to done)
+curl -X PUT http://localhost:3000/api/tasks/task-001/set-reviewed
 ```
 
 ### Session Attachment
@@ -271,7 +293,7 @@ When TheNexus assigns you a **refinement task**, your goal is to **enrich the ta
 
 **Automatic Refinement Trigger:**
 - **Moving any task to "refinement" status automatically spawns Lyra** (the default refinement agent)
-- This happens whether you use the UI, API, or any other method
+- This happens whether you use the API or UI
 - The agent will enrich the description and move the task back to "todo" when complete
 
 **Using TheNexus API:**
@@ -298,12 +320,6 @@ curl http://localhost:3000/api/tasks/task-001
 - Output should be actionable for the next agent
 - Keep refinement focused and concise
 
-**TheNexus UI:**
-- Tasks in "refinement" status appear in the Refinement column
-- Click "Refine" on a todo task to assign an agent for refinement
-- Agent selection dropdown defaults to Lyra (Product Manager)
-- After refinement complete, task moves back to todo with enriched description
-
 ### Completing Work
 
 ```bash
@@ -314,46 +330,6 @@ curl -X PATCH http://localhost:3000/api/tasks/task-001 \
 ```
 
 **Best Practice:** Always complete your task before ending a session!
-
----
-
-## Task Flags
-
-Set completion flags instead of changing status:
-
-```bash
-# Mark refinement complete (auto-moves to in-progress)
-pm task flag <id> refined
-
-# Mark work complete (auto-moves to review)
-pm task flag <id> done
-
-# Mark review complete (auto-moves to done)
-pm task flag <id> reviewed
-```
-
-## Task Types
-
-Create tasks with appropriate type:
-
-```bash
-pm task add "Fix bug" --type coding
-pm task add "Research API" --type research
-```
-
-## Status Changes (Manual)
-
-Only use for backlog management:
-
-```bash
-pm task move <id> todo
-pm task move <id> refinement
-pm task move <id> in-progress
-pm task move <id> review
-pm task move <id> done
-```
-
-**Note:** Status changes clear the worker_agent field.
 
 ---
 
@@ -434,6 +410,7 @@ TheNexus reads from SQLite database to display:
 3. **Move tasks promptly** - Keep kanban accurate
 4. **Review context when switching** - Refresh your memory on project goals
 5. **Check API health if issues occur** - `curl http://localhost:3000/api/health`
+6. **Use flags for auto-transition** - Prefer `set-refined`, `set-done`, `set-reviewed` over manual status changes
 
 ---
 

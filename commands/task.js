@@ -1,8 +1,24 @@
 #!/usr/bin/env node
 /**
- * Project Manager CLI - Task Commands
- * Updated to use async/await for TheNexus API integration
+ * ⚠️  DEPRECATED: pm task CLI commands are deprecated.
+ * 
+ * This file is retained for backward compatibility only.
+ * All new code should use direct TheNexus API calls (curl/fetch).
+ * 
+ * See SKILL.md for API examples.
+ * 
+ * Example migration:
+ *   OLD: pm task add "Fix bug" --type coding
+ *   NEW: curl -X POST http://localhost:3000/api/tasks -H "Content-Type: application/json" -d '{"title":"Fix bug","type":"coding"}'
+ * 
+ *   OLD: pm task flag task-100 refined
+ *   NEW: curl -X PUT http://localhost:3000/api/tasks/task-100/set-refined
+ * 
+ *   OLD: pm task move task-100 in-progress
+ *   NEW: curl -X PATCH http://localhost:3000/api/tasks/task-100 -H "Content-Type: application/json" -d '{"status":"in-progress"}'
  */
+
+console.warn('⚠️  WARNING: pm task CLI is deprecated. Use direct TheNexus API calls (curl/fetch) instead. See SKILL.md for examples.\n');
 
 const pm = require('../lib/project.js');
 
