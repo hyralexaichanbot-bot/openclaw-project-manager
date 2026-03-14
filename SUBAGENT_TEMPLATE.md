@@ -1,88 +1,82 @@
-# Subagent Spawn Template for Project Tasks
+# TheNexus Subagent Task Template
 
-## When to Use
-
-When spawning a subagent to work on a task tracked in **TheNexus** task system.
-
-## Template Structure
+Use this when spawning a subagent for a task managed in TheNexus.
 
 ```markdown
-**Task-XXX:** "<task title>"
-
-**Full Description:**
-"<task description from TheNexus>"
-
-## Project Context
-
-This task is tracked in **TheNexus**.
+**Task:** <task-id> - <task title>
 
 **Project:** <project-name>
-**Task ID:** task-XXX
-**Project Location:** /home/azureuser/dev/<project-folder>
+**Type:** <coding|research>
+**Current Status:** <todo|refinement|in-progress|review|done>
+**Assigned Role:** <lyra|coder|marcus>
 
-## Task Management
+## Task Description
 
-Tasks are managed through **TheNexus API**.
+<full task description from TheNexus>
 
-Common operations:
+## Required Lifecycle
+
+1. Acknowledge the task:
 
 ```bash
-# Update task status
-PATCH http://localhost:3000/api/tasks/task-XXX
-
-# Start a task
-POST http://localhost:3000/api/tasks/start
-
-# Get task information
-GET http://localhost:3000/api/tasks
+curl -X POST http://localhost:3000/api/tasks/<task-id>/acknowledge \
+  -H "Content-Type: application/json" \
+  -d '{
+    "role": "<lyra|coder|marcus>",
+    "sessionKey": "<your-actual-session-key>"
+  }'
 ```
 
-Subagents should focus on **implementing the task and validating that the result works**. Task status will normally be updated by the orchestrator.
+2. Do the assigned stage only.
 
-## What to Do
+3. If your stage changes the task description, update it first:
 
-**At Session Start:**
-1. Read the full task description
-2. Understand the goal and expected outcome
-3. Locate the relevant project files
-
-**During Work:**
-4. Implement the required changes
-5. Test your work locally
-6. Verify the feature behaves correctly
-
-**Before Finishing:**
-7. Confirm the task objective is satisfied
-8. Ensure the project still runs without errors
-9. Validate UI behavior if frontend changes were made
-
-## Technical Context
-
-<Tech stack, file locations, API endpoints, etc. specific to this task>
-
-## Files to Modify
-
-- `/path/to/file1` - What to change
-- `/path/to/file2` - What to change
-
-## Testing
-
-How to verify your work:
-
-1. Run the project
-2. Execute the relevant feature
-3. Confirm expected behavior
-4. Ensure no regressions were introduced
-
----
-
-**Important:** Always read the full task description and verify that the implemented solution actually works before ending the session.
+```bash
+curl -X PUT http://localhost:3000/api/tasks/<task-id> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "<task title>",
+    "description": "<updated description>",
+    "type": "<coding|research>",
+    "project": "<project-name>",
+    "priority": "<priority-or-null>",
+    "tags": ["<tag>"]
+  }'
 ```
 
-## Key Points
+4. Complete the stage:
 
-1. Always include the **full task description**
-2. Provide **clear project context**
-3. Include **technical details and file locations**
-4. Ensure the subagent **tests its implementation**
-5. The focus is **building working features**, not managing task state
+```bash
+curl -X POST http://localhost:3000/api/tasks/<task-id>/complete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Concise summary of what you completed."
+  }'
+```
+
+5. If you cannot finish the stage, fail it:
+
+```bash
+curl -X POST http://localhost:3000/api/tasks/<task-id>/fail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Concise summary of why the stage failed."
+  }'
+```
+
+## Follow-up Work
+
+If the assignment is research and you discover clearly actionable new work, create new tasks with:
+
+```bash
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "<new task title>",
+    "project": "<project-name>",
+    "type": "<coding|research>",
+    "description": "<why this follow-up is needed>",
+    "priority": "<priority>"
+  }'
+```
+```

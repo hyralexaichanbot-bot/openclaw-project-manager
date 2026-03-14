@@ -1,16 +1,15 @@
-# Task Refinement Prompt Template (Project Manager)
+# TheNexus Refinement Prompt Template
 
-This template is used by the `pm` CLI to automatically refine task descriptions.
-Customize this file to match your preferred refinement style.
+Refinement is planning, not implementation.
 
-## Template Variables
+When refining a task:
 
-- `{{title}}` - Task title
-- `{{description}}` - Original description
-- `{{project}}` - Project name
+- restate the objective clearly
+- capture the relevant context
+- describe the intended technical approach
+- define acceptance criteria
+- call out risks or unknowns that matter for the next stage
 
-## Refinement Instructions
-
-Do some research and enrich the task description with clear instruction to acheive the task.
-
-Return the refined description in markdown format with proper section headers.
+Do not implement the task in the refinement response.
+Do not include completion instructions unrelated to the task itself.
+Produce an updated task description in clear markdown that the next agent can execute directly.

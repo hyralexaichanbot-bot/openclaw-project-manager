@@ -1,509 +1,200 @@
 ---
 name: thenexus
-description: "Multi-project task and memory management via TheNexus API. Create projects, manage tasks, and save project-specific memories."
+description: "Role-aware TheNexus workflow skill for creating tasks and completing assigned refinement, research, coding, and review stages."
 ---
 
-# TheNexus - Project Manager Skill
+# TheNexus Workflow Skill
 
-Multi-project task and memory management for OpenClaw agents via TheNexus API.
+Use TheNexus as the system of record for project tasks.
 
-## Purpose
+Base URL:
 
-Manage multiple projects simultaneously with isolated context, tasks, and memories. Enables seamless context switching between projects while maintaining full history and learnings for each.
-
-## Architecture
-
-**TheNexus API:**
-
-All task and project operations use TheNexus API (`http://localhost:3000/api/*`). Data is stored in SQLite with automatic backups.
-
-- **Single Source of Truth:** TheNexus → SQLite database
-- **No local files:** All data accessed via API
-- **Real-time updates:** WebSocket pushes changes to UI
-
-**TheNexus Server:**
-- URL: `http://localhost:3000`
-- Health: `http://localhost:3000/api/health`
-- Database: `/home/azureuser/dev/TheNexus/nexus.db`
-
-**If API is unavailable:**
 ```bash
-# Check if TheNexus is running
-curl http://localhost:3000/api/health
-
-# Expected response:
-# {"status":"healthy","timestamp":"...","uptime":12345}
-
-# If connection refused or error:
-# "TheNexus API is not running. Start it with: sudo systemctl start thenexus"
-```
-
----
-
-## TheNexus API Reference
-
-### Base URL
-```
 http://localhost:3000/api
 ```
 
-### Projects
+## Core Rules
 
-**List all projects:**
+1. Create tasks with `POST /api/tasks`.
+2. Do not use generic status patches as the normal workflow.
+3. When TheNexus assigns you a task, call:
+   - `POST /api/tasks/:id/acknowledge`
+   - `POST /api/tasks/:id/complete`
+   - `POST /api/tasks/:id/fail`
+4. `complete` and `fail` always require a concise `summary`.
+5. If your stage changes the task description, update the task first with `PUT /api/tasks/:id`, then call `complete`.
+6. Research work may create justified follow-up tasks with the same `POST /api/tasks` API used by the UI.
+
+## Health Check
+
 ```bash
-curl http://localhost:3000/api/projects
+curl http://localhost:3000/api/health
 ```
 
-**Get single project:**
-```bash
-curl http://localhost:3000/api/projects/<project-name>
-```
+## Shared API
 
-**Create project:**
-```bash
-curl -X POST http://localhost:3000/api/projects \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-project","description":"Optional description"}'
-```
+### List tasks
 
-**Update active project:**
 ```bash
-curl -X PUT http://localhost:3000/api/projects/active \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-project"}'
-```
-
-### Tasks
-
-**List all tasks (with optional filters):**
-```bash
-# All tasks
 curl http://localhost:3000/api/tasks
-
-# Filter by project
-curl "http://localhost:3000/api/tasks?project=thenexus"
-
-# Filter by status
+curl "http://localhost:3000/api/tasks?project=my-project"
 curl "http://localhost:3000/api/tasks?status=in-progress"
-
-# Filter by both
-curl "http://localhost:3000/api/tasks?project=thenexus&status=todo"
-```
-
-**Get single task:**
-```bash
 curl http://localhost:3000/api/tasks/task-001
 ```
 
-**Get next task for an agent:**
-```bash
-# Lyra (refinement): research tasks in todo, or coding tasks in refinement
-curl "http://localhost:3000/api/tasks/nexttask?agent=lyra"
+### Create task
 
-# Coder (coding): coding tasks in in-progress (refined=true)
-curl "http://localhost:3000/api/tasks/nexttask?agent=coder"
+Use this from the UI path or from any agent that needs to add work.
 
-# Marcus (QA): any task in review
-curl "http://localhost:3000/api/tasks/nexttask?agent=marcus"
-```
-
-**Create task:**
 ```bash
 curl -X POST http://localhost:3000/api/tasks \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Fix the bug",
-    "description": "Optional detailed description",
+    "title": "Investigate API latency",
     "project": "thenexus",
+    "type": "research",
+    "description": "Find the cause of the latency spike.",
     "priority": "high",
-    "tags": ["bug", "urgent"]
+    "tags": ["api", "latency"]
   }'
 ```
 
-**Update task (full update):**
+### Update task details
+
+Use this when refinement changes the description or when task metadata must be corrected.
+
 ```bash
 curl -X PUT http://localhost:3000/api/tasks/task-001 \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Updated title",
-    "description": "Updated description",
-    "priority": "medium",
-    "tags": ["bug"],
+    "title": "Investigate API latency",
+    "description": "Refined markdown description here",
+    "type": "research",
+    "priority": "high",
+    "tags": ["api", "latency"],
     "project": "thenexus"
   }'
 ```
 
-**Change task status:**
-```bash
-curl -X PATCH http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"in-progress"}'
-```
+## Explicit Lifecycle API
 
-**Attach session to task:**
+### Acknowledge assigned work
+
+Call this once you actually begin the assigned stage.
+
 ```bash
-curl -X PUT http://localhost:3000/api/tasks/task-001 \
+curl -X POST http://localhost:3000/api/tasks/task-001/acknowledge \
   -H "Content-Type: application/json" \
   -d '{
-    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
-    "project": "thenexus"
+    "role": "lyra",
+    "sessionKey": "agent:lyra:discord:channel:123"
   }'
 ```
 
-**Delete task:**
+### Complete assigned work
+
 ```bash
-curl -X DELETE http://localhost:3000/api/tasks/task-001
+curl -X POST http://localhost:3000/api/tasks/task-001/complete \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Completed the stage, validated the result, and captured the key outcome."
+  }'
 ```
 
-### Task Flags (Auto-Transition)
+### Fail assigned work
 
-Set completion flags instead of changing status manually. Flags trigger automatic status transitions.
+Use this if you cannot finish the current stage.
 
 ```bash
-# Mark refinement complete (auto-moves to in-progress)
-curl -X PUT http://localhost:3000/api/tasks/task-001/set-refined
-
-# Mark work complete (auto-moves to review)
-curl -X PUT http://localhost:3000/api/tasks/task-001/set-done
-
-# Mark review complete (auto-moves to done)
-curl -X PUT http://localhost:3000/api/tasks/task-001/set-reviewed
+curl -X POST http://localhost:3000/api/tasks/task-001/fail \
+  -H "Content-Type: application/json" \
+  -d '{
+    "summary": "Blocked by missing credentials. Review cannot proceed."
+  }'
 ```
 
-### Session Attachment
+## Role Workflows
 
-**Why attach sessions:** Links agent work sessions to specific tasks for tracking and audit trail.
+### Lyra: refinement
 
-**When to attach:**
-- When starting work on a task
-- After spawning a subagent for a task
+When a task is in `todo`, Lyra owns the refinement stage.
 
-**How to attach:**
+Workflow:
+
+1. Read the task.
+2. Call `acknowledge` with role `lyra`.
+3. Enrich the description only.
+4. Save the refined description with `PUT /api/tasks/:id`.
+5. Call `complete` with a concise summary.
+
+Refinement means:
+
+- clarify scope
+- add technical context
+- add acceptance criteria
+- make the next stage executable
+
+Do not implement the feature during refinement.
+
+### Lyra: research execution
+
+When a research task moves to `in-progress`, Lyra owns the actual research work.
+
+Workflow:
+
+1. Call `acknowledge` with role `lyra`.
+2. Perform the research.
+3. Create new tasks with `POST /api/tasks` if the research clearly produces actionable follow-up work.
+4. Call `complete` with a concise summary of findings and outcomes.
+
+Research execution means:
+
+- do the actual investigation
+- summarize evidence and conclusions
+- create justified follow-up tasks when needed
+
+### Coder: coding execution
+
+When a coding task moves to `in-progress`, Coder owns the implementation stage.
+
+Workflow:
+
+1. Call `acknowledge` with role `coder`.
+2. Implement the task.
+3. Test locally.
+4. Update the task description if implementation details materially changed.
+5. Call `complete` with a concise summary of the delivered change and validation.
+
+### Marcus: review
+
+When a coding task moves to `review`, Marcus owns the validation stage.
+
+Workflow:
+
+1. Call `acknowledge` with role `marcus`.
+2. Review the work and run the relevant checks.
+3. If review passes, call `complete` with a concise summary.
+4. If review fails, call `fail` with a concise summary of what is wrong.
+
+Review means:
+
+- validate the change
+- confirm expected behavior
+- reject clearly when the work is not acceptable
+
+## Session Key
+
+Use your actual active session key when acknowledging work.
+
+Get it with:
+
 ```bash
-# Get your session key
 openclaw status
-
-# Attach to task
-curl -X PUT http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"sessionKey":"agent:coder:discord:channel:1476147784477315155","project":"thenexus"}'
 ```
 
-**Session key format:** `agent:<agent-id>:<channel-type>:<channel-id>`
-
-Examples:
-- `agent:coder:discord:channel:1476147784477315155`
-- `agent:main:discord:channel:1474992984247238879`
-- `agent:coder:subagent:<uuid>`
-
-### Agents
-
-**List available agents:**
-```bash
-curl http://localhost:3000/api/agents
-```
-
-**Start task with agent (via UI):**
-```bash
-curl -X POST http://localhost:3000/api/tasks/start \
-  -H "Content-Type: application/json" \
-  -d '{
-    "taskId": "task-001",
-    "agentId": "coder",
-    "project": "thenexus"
-  }'
-```
-
-**Start refinement (explicit):**
-```bash
-curl -X POST http://localhost:3000/api/tasks/task-001/start-refinement \
-  -H "Content-Type: application/json" \
-  -d '{
-    "agentId": "lyra",
-    "project": "thenexus"
-  }'
-```
-
-### Error Responses
-
-**404 Not Found:**
-```json
-{"error": "Task 'task-999' not found"}
-```
-
-**400 Bad Request:**
-```json
-{"error": "Title and project are required"}
-```
-
-**500 Server Error:**
-```json
-{"error": "Database error message"}
-```
-
----
-
-## Workflow
-
-### Starting Work on a Project
-
-**Using TheNexus API:**
-```bash
-# Switch active project
-curl -X PUT http://localhost:3000/api/projects/active \
-  -H "Content-Type: application/json" \
-  -d '{"name":"my-project"}'
-
-# Get tasks for project
-curl "http://localhost:3000/api/tasks?project=my-project"
-
-# Attach your session
-curl -X PUT http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
-    "project": "my-project"
-  }'
-```
-
-### When Assigned a Task via TheNexus
-
-**Important:** When TheNexus assigns you a task, it does NOT automatically change the task status. **You are responsible for moving the task to in-progress** when you start working.
-
-```bash
-# When you receive a task assignment from TheNexus:
-# 1. Acknowledge the task
-
-# 2. Move it to in-progress:
-curl -X PATCH http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"in-progress"}'
-
-# 3. Attach your session (for tracking)
-curl -X PUT http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{
-    "sessionKey": "agent:coder:discord:channel:1476147784477315155",
-    "project": "thenexus"
-  }'
-
-# 4. Start working on the task
-
-# 5. When done, mark complete:
-curl -X PATCH http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"done"}'
-```
-
-**Get your session key:** Run `openclaw status` or check the session context at the top of your conversation.
-
-### When Assigned a Refinement Task via TheNexus
-
-**Refinement** is a separate status/column in the kanban board. Tasks flow: `todo` → `refinement` → `todo` → `in-progress` → `done`.
-
-When TheNexus assigns you a **refinement task**, your goal is to **enrich the task description** with context, technical approach, and acceptance criteria - NOT to implement the feature.
-
-**Automatic Refinement Trigger:**
-- **Moving any task to "refinement" status automatically spawns Lyra** (the default refinement agent)
-- This happens whether you use the API or UI
-- The agent will enrich the description and move the task back to "todo" when complete
-
-**Using TheNexus API:**
-```bash
-# Move task to refinement (automatically spawns Lyra)
-curl -X PATCH http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"refinement"}'
-
-# OR use the dedicated refinement endpoint (specify agent)
-curl -X POST http://localhost:3000/api/tasks/task-001/start-refinement \
-  -H "Content-Type: application/json" \
-  -d '{"agentId":"lyra","project":"thenexus"}'
-
-# After enrichment complete, task moves back to todo automatically
-# You can verify with:
-curl http://localhost:3000/api/tasks/task-001
-```
-
-**Key Principles:**
-- **Refinement is about planning/design, NOT implementation**
-- Use all available tools (code search, web, docs) to understand the problem
-- Ask questions early if requirements are unclear
-- Output should be actionable for the next agent
-- Keep refinement focused and concise
-
-### Completing Work
-
-```bash
-# Mark task done
-curl -X PATCH http://localhost:3000/api/tasks/task-001 \
-  -H "Content-Type: application/json" \
-  -d '{"status":"done"}'
-```
-
-**Best Practice:** Always complete your task before ending a session!
-
----
-
-## Data Structure
-
-### TheNexus Storage
-
-**Primary:** SQLite database at `/home/azureuser/dev/TheNexus/nexus.db`
-
-**Tables:**
-- `projects` - Project metadata
-- `tasks` - All tasks with status, sessions, etc.
-- `memories` - Project-specific memories
-
-**Backup:** TheNexus maintains automatic backups. Manual backup:
-```bash
-cp /home/azureuser/dev/TheNexus/nexus.db /home/azureuser/dev/TheNexus/nexus.db.bak
-```
-
-### Task Schema
-
-```json
-{
-  "id": "task-001",
-  "projectName": "thenexus",
-  "title": "Build feature",
-  "description": "Description here",
-  "status": "done",
-  "priority": "high",
-  "tags": ["feature", "ui"],
-  "createdAt": "2026-03-06T08:00:00Z",
-  "updatedAt": "2026-03-06T20:00:00Z",
-  "startedAt": "2026-03-06T10:00:00Z",
-  "completedAt": "2026-03-06T20:00:00Z",
-  "refined": true,
-  "refinedAt": "2026-03-06T09:00:00Z",
-  "refinedBy": "agent:coder:manual-refine",
-  "assignedAgent": "coder",
-  "sessionKey": "agent:coder:discord:channel:1476147784477315155",
-  "refinementSessionKey": null
-}
-```
-
----
-
-## Integration with TheNexus UI
-
-**TheNexus Dashboard:** `http://localhost:3000`
-
-TheNexus reads from SQLite database to display:
-
-- Project list with task counts
-- Kanban board per project (todo, refinement, in-progress, done columns)
-- Task details with sessions attached
-- Agent activity and session history
-- Real-time updates via WebSocket
-
-**UI Features:**
-- Click tasks to view/edit details
-- Drag tasks between status columns
-- Filter by project, status, tags
-- Start tasks with specific agents
-- View session transcripts
-- Create tasks with refinement option
-
-**API + UI relationship:**
-- API → SQLite database
-- UI → SQLite database → Real-time display
-- Both can be used interchangeably
-- Changes via API immediately visible in UI
-
----
-
-## Best Practices
-
-1. **Always attach sessions** - Track which sessions worked on which projects
-2. **Use descriptive task titles** - "Fix login bug" not "Fix bug"
-3. **Move tasks promptly** - Keep kanban accurate
-4. **Review context when switching** - Refresh your memory on project goals
-5. **Check API health if issues occur** - `curl http://localhost:3000/api/health`
-6. **Use flags for auto-transition** - Prefer `set-refined`, `set-done`, `set-reviewed` over manual status changes
-
----
-
-## Spawning Subagents for Tasks
-
-When spawning a subagent to work on a project task, **always include**:
-
-1. **Full task description** (not just title)
-2. **Project context** (which project, task ID, location)
-3. **API instructions** (how to move task to in-progress and complete)
-4. **Explicit completion reminder** (run status update when done)
-
-**Example:**
-```bash
-# Spawn subagent with task context
-openclaw agent --agent coder --message "
-**Task:** task-001 - Fix the bug
-**Project:** thenexus
-
-**Instructions:**
-1. Move task to in-progress:
-   curl -X PATCH http://localhost:3000/api/tasks/task-001 \\
-     -H 'Content-Type: application/json' \\
-     -d '{\"status\":\"in-progress\"}'
-
-2. Attach your session:
-   curl -X PUT http://localhost:3000/api/tasks/task-001 \\
-     -H 'Content-Type: application/json' \\
-     -d '{\"sessionKey\":\"<your-session-key>\",\"project\":\"thenexus\"}'
-
-3. Work on the task
-
-4. When done, mark complete:
-   curl -X PATCH http://localhost:3000/api/tasks/task-001 \\
-     -H 'Content-Type: application/json' \\
-     -d '{\"status\":\"done\"}'
-"
-```
-
----
-
-## Troubleshooting
-
-**TheNexus API not responding:**
-```bash
-# Check if running
-curl http://localhost:3000/api/health
-
-# If connection refused:
-sudo systemctl status thenexus
-sudo systemctl start thenexus
-
-# Check logs
-journalctl -u thenexus --no-pager -n 50
-```
-
-**Task not found:**
-- Verify task ID is correct (format: `task-XXX`)
-- Check task exists: `curl http://localhost:3000/api/tasks/task-XXX`
-- Verify project name matches
-
-**Session not attaching:**
-- Verify session key format: `agent:<agent-id>:<channel-type>:<channel-id>`
-- Get your session: `openclaw status`
-- Check task exists before attaching
-
-**Refinement not triggering:**
-- Ensure status is exactly `"refinement"` (case-sensitive)
-- Check Lyra agent is available: `curl http://localhost:3000/api/agents`
-- Review logs: `journalctl -u thenexus --no-pager -n 100`
-
----
-
-## Environment Variables
-
-**Optional configuration:**
-
-```bash
-# Default refinement agent (default: lyra)
-REFINEMENT_DEFAULT_AGENT=lyra
-
-# TheNexus URL (default: http://localhost:3000)
-THENEXUS_URL=http://localhost:3000
-```
+## Notes
+
+- Do not invent workflow transitions yourself.
+- Do not treat `todo`, `refinement`, `in-progress`, `review`, and `done` as a freeform kanban.
+- TheNexus advances tasks when you call `complete`.
+- If TheNexus already assigned you a task, do not create a duplicate task for the same work.
