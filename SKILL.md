@@ -5,7 +5,7 @@ description: "Role-aware TheNexus workflow skill for creating tasks and completi
 
 # TheNexus Workflow Skill
 
-Use TheNexus as the system of record for project tasks.
+Use TheNexus as the system of record for project tasks and project metadata.
 
 Base URL:
 
@@ -41,6 +41,23 @@ curl "http://localhost:3000/api/tasks?project=my-project"
 curl "http://localhost:3000/api/tasks?status=in-progress"
 curl http://localhost:3000/api/tasks/task-001
 ```
+
+### Read project details
+
+Before making project-specific filesystem assumptions, fetch the project from TheNexus and use the returned `folder` as the repository root.
+
+```bash
+curl http://localhost:3000/api/projects
+curl http://localhost:3000/api/projects/thenexus
+```
+
+The project response includes:
+
+- `name`
+- `description`
+- `folder`
+
+Inspect repo-local files such as `AGENTS.md`, `README.md`, and relevant source files from that folder. Do not assume a separate TheNexus-managed `context.md` or `memory.md` directory exists outside the repository.
 
 ### Create task
 
@@ -122,10 +139,12 @@ When a task is in `todo`, Lyra owns the refinement stage.
 Workflow:
 
 1. Read the task.
-2. Call `acknowledge` with role `lyra`.
-3. Enrich the description only.
-4. Save the refined description with `PUT /api/tasks/:id`.
-5. Call `complete` with a concise summary.
+2. Fetch the project details with `GET /api/projects/:name` if you need the repository folder.
+3. Call `acknowledge` with role `lyra`.
+4. Inspect the repository from the returned project `folder`.
+5. Enrich the description only.
+6. Save the refined description with `PUT /api/tasks/:id`.
+7. Call `complete` with a concise summary.
 
 Refinement means:
 
@@ -161,9 +180,10 @@ Workflow:
 
 1. Call `acknowledge` with role `coder`.
 2. Implement the task.
-3. Test locally.
-4. Update the task description if implementation details materially changed.
-5. Call `complete` with a concise summary of the delivered change and validation.
+3. Use the project `folder` from `GET /api/projects/:name` as the repository root when locating code.
+4. Test locally.
+5. Update the task description if implementation details materially changed.
+6. Call `complete` with a concise summary of the delivered change and validation.
 
 ### Marcus: review
 
@@ -172,9 +192,10 @@ When a coding task moves to `review`, Marcus owns the validation stage.
 Workflow:
 
 1. Call `acknowledge` with role `marcus`.
-2. Review the work and run the relevant checks.
-3. If review passes, call `complete` with a concise summary.
-4. If review fails, call `fail` with a concise summary of what is wrong.
+2. Use the project `folder` from `GET /api/projects/:name` as the repository root.
+3. Review the work and run the relevant checks.
+4. If review passes, call `complete` with a concise summary.
+5. If review fails, call `fail` with a concise summary of what is wrong.
 
 Review means:
 
@@ -198,3 +219,4 @@ openclaw status
 - Do not treat `todo`, `refinement`, `in-progress`, `review`, and `done` as a freeform kanban.
 - TheNexus advances tasks when you call `complete`.
 - If TheNexus already assigned you a task, do not create a duplicate task for the same work.
+- Resolve project folder location from TheNexus instead of guessing a filesystem path.

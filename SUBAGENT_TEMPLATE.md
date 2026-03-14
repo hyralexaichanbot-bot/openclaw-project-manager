@@ -6,6 +6,7 @@ Use this when spawning a subagent for a task managed in TheNexus.
 **Task:** <task-id> - <task title>
 
 **Project:** <project-name>
+**Project Folder:** <repository-folder-from-thenexus>
 **Type:** <coding|research>
 **Current Status:** <todo|refinement|in-progress|review|done>
 **Assigned Role:** <lyra|coder|marcus>
@@ -13,6 +14,10 @@ Use this when spawning a subagent for a task managed in TheNexus.
 ## Task Description
 
 <full task description from TheNexus>
+
+## Project Context
+
+Use `<repository-folder-from-thenexus>` as the repository root. Inspect repo-local files such as `AGENTS.md`, `README.md`, and the relevant source tree. Do not assume separate TheNexus-managed `context.md` or `memory.md` files exist outside the repository.
 
 ## Required Lifecycle
 
