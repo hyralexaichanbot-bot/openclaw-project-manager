@@ -11,6 +11,6 @@ Customize this file to match your preferred refinement style.
 
 ## Refinement Instructions
 
-Enrich the task description with clear sections for objective, context, technical approach, files to modify, acceptance criteria, dependencies, and potential pitfalls.
+Do some research and enrich the task description with clear instruction to acheive the task.
 
 Return the refined description in markdown format with proper section headers.

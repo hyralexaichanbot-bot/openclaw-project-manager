@@ -1,6 +1,6 @@
 ---
-name: project-manager
-description: "Multi-project task and memory management via TheNexus API. Create projects, manage tasks with kanban, and save project-specific memories."
+name: thenexus
+description: "Multi-project task and memory management via TheNexus API. Create projects, manage tasks, and save project-specific memories."
 ---
 
 # TheNexus - Project Manager Skill
@@ -93,6 +93,18 @@ curl "http://localhost:3000/api/tasks?project=thenexus&status=todo"
 **Get single task:**
 ```bash
 curl http://localhost:3000/api/tasks/task-001
+```
+
+**Get next task for an agent:**
+```bash
+# Lyra (refinement): research tasks in todo, or coding tasks in refinement
+curl "http://localhost:3000/api/tasks/nexttask?agent=lyra"
+
+# Coder (coding): coding tasks in in-progress (refined=true)
+curl "http://localhost:3000/api/tasks/nexttask?agent=coder"
+
+# Marcus (QA): any task in review
+curl "http://localhost:3000/api/tasks/nexttask?agent=marcus"
 ```
 
 **Create task:**
